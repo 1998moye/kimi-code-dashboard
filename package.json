@@ -1,0 +1,86 @@
+{
+  "name": "kimi-code-dashboard",
+  "displayName": "Kimi Code 仪表盘",
+  "description": "Kimi Code 辅助面板：思考级别切换、Token 用量统计、官方额度占比（5小时/每周/月度/赠送）、上下文配置",
+  "version": "0.1.8",
+  "publisher": "Dingzhen",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/1998moye/kimi-code-dashboard"
+  },
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#1e1e2e",
+    "theme": "dark"
+  },
+  "keywords": [
+    "kimi",
+    "kimi-code",
+    "moonshot",
+    "token",
+    "quota",
+    "用量",
+    "额度"
+  ],
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "kimi-companion",
+          "title": "Kimi 仪表盘",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "kimi-companion": [
+        {
+          "type": "webview",
+          "id": "kimiCompanion.dashboard",
+          "name": "控制面板"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "kimi-companion.openDashboard",
+        "title": "Kimi 仪表盘: 打开面板"
+      },
+      {
+        "command": "kimi-companion.switchEffort",
+        "title": "Kimi 仪表盘: 切换思考级别"
+      },
+      {
+        "command": "kimi-companion.refresh",
+        "title": "Kimi 仪表盘: 刷新数据"
+      }
+    ],
+    "configuration": {
+      "title": "Kimi Code 仪表盘",
+      "properties": {
+        "kimiCompanion.kimiHome": {
+          "type": "string",
+          "default": "",
+          "description": "Kimi Code 数据目录（留空则依次使用 KIMI_CODE_HOME 环境变量、~/.kimi-code）"
+        },
+        "kimiCompanion.webToken": {
+          "type": "string",
+          "default": "",
+          "description": "kimi.com 网页登录 token（用于显示月度总量/赠送额度；浏览器登录 kimi.com 后从开发者工具 Authorization: Bearer 头复制，约 30 天有效）"
+        }
+      }
+    }
+  }
+}
