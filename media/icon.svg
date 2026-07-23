@@ -1,5 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <rect x="0" y="0" width="128" height="128" rx="26" fill="#0d0d0f"/>
-  <path d="M44 34 v60 h11 V76 l24 18 h15 L66 72 93 34 H79 L55 62 V34 Z" fill="#ffffff"/>
-  <circle cx="103" cy="26" r="8" fill="#2d7dff"/>
+  <defs>
+    <clipPath id="r"><rect x="0" y="0" width="128" height="128" rx="26"/></clipPath>
+  </defs>
+  <g clip-path="url(#r)">
+    <rect x="0" y="0" width="128" height="128" rx="26" fill="#0d0d0f"/>
+    <rect x="34" y="30" width="12" height="68" fill="#ffffff"/>
+    <polygon points="84,30 72,30 50,64 72,98 84,98 62,64" fill="#ffffff"/>
+    <circle cx="104" cy="23" r="7" fill="#2d7dff"/>
+    <g fill="#ffffff">
+      <circle cx="12" cy="120" r="1.2" opacity=".5"/><circle cx="24" cy="124" r="1" opacity=".35"/>
+      <circle cx="31" cy="116" r="1.4" opacity=".6"/><circle cx="45" cy="122" r="1" opacity=".4"/>
+      <circle cx="56" cy="118" r="1.3" opacity=".55"/><circle cx="68" cy="124" r="1" opacity=".3"/>
+      <circle cx="78" cy="119" r="1.2" opacity=".5"/><circle cx="90" cy="123" r="1" opacity=".4"/>
+      <circle cx="100" cy="117" r="1.3" opacity=".55"/><circle cx="112" cy="122" r="1" opacity=".35"/>
+      <circle cx="120" cy="118" r="1.2" opacity=".5"/><circle cx="18" cy="112" r="1" opacity=".3"/>
+      <circle cx="62" cy="111" r="1" opacity=".35"/><circle cx="95" cy="110" r="1" opacity=".3"/>
+    </g>
+  </g>
 </svg>
