@@ -1,6 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-  <g transform="translate(-2.4,-2.4) scale(1.2)">
-    <path d="M12 3a7 7 0 1 0 7 7 5.5 5.5 0 0 1-7-7z" opacity="0.95"/>
-    <circle cx="18.5" cy="5.5" r="1.6" fill="#2d7dff"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="currentColor">
+  <rect x="26" y="22" width="13" height="84"/>
+  <polygon points="90,22 76,22 50,64 76,106 90,106 64,64"/>
+  <circle cx="99" cy="26" r="8"/>
 </svg>
