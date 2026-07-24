@@ -66,37 +66,6 @@ async function refreshAll(opts) {
   if (provider) provider.postState(state);
 }
 
-async function switchEffort() {
-  const state = await collectState();
-  const { config } = state;
-  if (!config.exists) {
-    vscode.window.showErrorMessage(`未找到配置文件：${config.configPath}`);
-    return;
-  }
-  const support = config.current && config.current.supportEfforts;
-  if (!support || support.length === 0) {
-    vscode.window.showInformationMessage('当前模型没有声明可选的思考档位（support_efforts）。');
-    return;
-  }
-  const picked = await vscode.window.showQuickPick(
-    support.map((e) => ({
-      label: e,
-      description: e === config.effectiveEffort ? '当前生效' : '',
-    })),
-    { placeHolder: `切换 ${config.current.displayName} 的思考级别（写入 config.toml，新会话生效）` }
-  );
-  if (!picked) return;
-  try {
-    kimiConfig.setThinkingEffort(config.configPath, picked.label);
-    vscode.window.showInformationMessage(
-      `思考级别已切换为 ${picked.label}（已写入 config.toml，对新会话生效）`
-    );
-    refreshAll();
-  } catch (err) {
-    vscode.window.showErrorMessage(`写入失败：${err.message}`);
-  }
-}
-
 class DashboardProvider {
   constructor(extensionUri) {
     this.extensionUri = extensionUri;
@@ -175,10 +144,6 @@ class DashboardProvider {
     try {
       if (msg.type === 'refresh') {
         await refreshAll({ forceQuota: true });
-      } else if (msg.type === 'setEffort') {
-        kimiConfig.setThinkingEffort(state.config.configPath, msg.effort);
-        vscode.window.showInformationMessage(`思考级别已切换为 ${msg.effort}（新会话生效）`);
-        refreshAll();
       } else if (msg.type === 'setContextSize') {
         const size = Number(msg.size);
         if (!Number.isInteger(size) || size < 1) throw new Error('无效的上下文大小');
@@ -327,11 +292,8 @@ function renderHtml(webview) {
 </head>
 <body>
   <div class="section">
-    <div class="section-head"><span class="section-title">思考级别</span><span class="muted" id="effort-model"></span></div>
-    <div class="card">
-      <div class="seg" id="effort-buttons"></div>
-      <div class="muted" style="margin-top:10px">K3 / K2.7 为 always_thinking 模型，思考不可关闭，只能调强度。此处为写入 config.toml 的持久化档位，对新会话生效；官方界面里选 max 不落配置，其 UI 显示与本面板可能不同，属官方设计。</div>
-    </div>
+    <div class="section-head"><span class="section-title">当前模型</span></div>
+    <div class="card" style="padding:10px 14px"><span id="effort-model" style="font-size:16px;font-weight:600"></span></div>
   </div>
 
   <div class="section">
@@ -538,18 +500,8 @@ function renderHtml(webview) {
       if (cbBtn) cbBtn.onclick = () => vscode.postMessage({ type: 'copyBookmarklet' });
     }
 
-    // 思考级别：只展示/写入 config.toml 持久化档位（这个值 100% 准确）
-    const cfgEff = cfg.effectiveEffort;
-    document.getElementById('effort-model').textContent = cfg.current ? cfg.current.displayName : '';
-    const btns = document.getElementById('effort-buttons');
-    btns.innerHTML = '';
-    for (const e of (cfg.current && cfg.current.supportEfforts) || []) {
-      const b = document.createElement('button');
-      b.className = e === cfgEff ? 'active' : '';
-      b.textContent = e;
-      b.onclick = () => vscode.postMessage({ type: 'setEffort', effort: e });
-      btns.appendChild(b);
-    }
+    // 当前模型（思考档位切换功能已移除：官方 max 为会话级设置，写配置无法覆盖官方 UI，属缺陷不再展示）
+    document.getElementById('effort-model').textContent = cfg.current ? cfg.current.displayName : '—';
 
     // 用量统计卡
     // 用量统计卡
@@ -616,7 +568,7 @@ function renderHtml(webview) {
 function activate(context) {
   extContext = context;
   statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-  statusBar.command = 'kimi-companion.switchEffort';
+  statusBar.command = 'kimi-companion.openDashboard';
   statusBar.show();
 
   provider = new DashboardProvider(context.extensionUri);
@@ -626,7 +578,6 @@ function activate(context) {
     vscode.commands.registerCommand('kimi-companion.openDashboard', () =>
       vscode.commands.executeCommand('kimiCompanion.dashboard.focus')
     ),
-    vscode.commands.registerCommand('kimi-companion.switchEffort', switchEffort),
     vscode.commands.registerCommand('kimi-companion.refresh', refreshAll)
   );
 
