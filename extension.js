@@ -247,6 +247,11 @@ function renderHtml(webview) {
   select.ctx { background: var(--vscode-input-background); color: var(--vscode-input-foreground);
                border: 1px solid var(--vscode-input-border, var(--border)); border-radius: 4px;
                padding: 4px 6px; font-size: 12px; }
+  input[type="date"].ctx { background: var(--vscode-input-background); color: var(--vscode-input-foreground);
+               border: 1px solid var(--vscode-input-border, var(--border)); border-radius: 4px;
+               padding: 3px 6px; font-size: 12px; color-scheme: dark; }
+  .range-date { display: none; }
+  .range-date.show { display: inline-block; }
   .pager { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
   .pager-btns { display: inline-flex; gap: 6px; align-items: center; }
 
@@ -303,6 +308,18 @@ function renderHtml(webview) {
 
   <div class="section">
     <div class="section-head"><span class="section-title">Token 用量</span><button class="btn ghost" id="refresh">⟳ 刷新</button></div>
+    <div class="filter-bar">
+      <select class="ctx" id="range-preset">
+        <option value="1">今天</option>
+        <option value="3">近 3 天</option>
+        <option value="7" selected>近 7 天</option>
+        <option value="0">全部</option>
+        <option value="custom">自定义</option>
+      </select>
+      <input class="ctx range-date" type="date" id="range-start">
+      <span class="muted range-date">~</span>
+      <input class="ctx range-date" type="date" id="range-end">
+    </div>
     <div class="stats" id="usage-summary"></div>
     <div class="muted" id="usage-note" style="margin-bottom:10px"></div>
     <div class="section-head" style="margin-top:4px"><span class="section-title">按模型</span></div>
@@ -310,12 +327,6 @@ function renderHtml(webview) {
     <div class="section-head" style="margin-top:14px"><span class="section-title">最近会话</span></div>
     <div class="filter-bar">
       <input class="ctx" id="session-filter" placeholder="关键词（标题/目录）">
-      <select class="ctx" id="session-range">
-        <option value="0">全部时间</option>
-        <option value="1">今天</option>
-        <option value="3">近 3 天</option>
-        <option value="7">近 7 天</option>
-      </select>
     </div>
     <div class="card list-card" id="usage-sessions"></div>
     <div class="pager">
@@ -357,6 +368,24 @@ function renderHtml(webview) {
     return denom > 0 ? Math.round((u.inputCacheRead / denom) * 100) + '%' : '—';
   };
 
+  // 全局时间范围（统计卡、按模型、会话共用）
+  let usageData = null;
+  const dayStr = (d) =>
+    d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  function currentRange() {
+    const p = document.getElementById('range-preset').value;
+    if (p === 'custom') {
+      return {
+        start: document.getElementById('range-start').value || null,
+        end: document.getElementById('range-end').value || null,
+      };
+    }
+    if (p === '0') return { start: null, end: null };
+    const days = Number(p);
+    return { start: dayStr(new Date(Date.now() - (days - 1) * 86400000)), end: dayStr(new Date()) };
+  }
+  const inRange = (dk, r) => (!r.start || dk >= r.start) && (!r.end || dk <= r.end);
+
   // 最近会话：筛选 + 分页
   let allSessions = [], page = 0;
   const PAGE_SIZE = 6;
@@ -370,14 +399,15 @@ function renderHtml(webview) {
     '<span class="muted">' + fmtDate(r.updatedAt) + '</span></div></div>';
   function renderSessions() {
     const kw = document.getElementById('session-filter').value.trim().toLowerCase();
-    const days = Number(document.getElementById('session-range').value);
-    let list = allSessions;
-    if (days > 0) {
-      const cutoff = Date.now() - days * 86400000;
-      list = list.filter((r) => r.updatedAt && Date.parse(r.updatedAt) >= cutoff);
-    }
-    if (kw) list = list.filter((r) => (r.title + ' ' + r.workDir).toLowerCase().includes(kw));
-    const totalTokens = list.reduce((a, r) => a + r.total, 0);
+    const r = currentRange();
+    let list = allSessions.filter((s) => {
+      if (!s.updatedAt) return !r.start;
+      const t = Date.parse(s.updatedAt);
+      return (!r.start || t >= new Date(r.start + 'T00:00:00').getTime()) &&
+             (!r.end || t <= new Date(r.end + 'T23:59:59').getTime());
+    });
+    if (kw) list = list.filter((r2) => (r2.title + ' ' + r2.workDir).toLowerCase().includes(kw));
+    const totalTokens = list.reduce((a, r2) => a + r2.total, 0);
     const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
     if (page >= pages) page = pages - 1;
     if (page < 0) page = 0;
@@ -389,9 +419,57 @@ function renderHtml(webview) {
     document.getElementById('page-info').textContent = (page + 1) + ' / ' + pages;
   }
 
+  // 统计卡 + 按模型：按当前时间范围从 byDay / byDayModel 现算
+  function renderUsage() {
+    if (!usageData) return;
+    const r = currentRange();
+    const sum = { inputOther: 0, output: 0, inputCacheRead: 0, inputCacheCreation: 0 };
+    const add = (dst, u) => {
+      dst.inputOther += u.inputOther || 0; dst.output += u.output || 0;
+      dst.inputCacheRead += u.inputCacheRead || 0; dst.inputCacheCreation += u.inputCacheCreation || 0;
+    };
+    for (const [dk, u] of Object.entries(usageData.byDay || {})) if (inRange(dk, r)) add(sum, u);
+    const total = sum.inputOther + sum.output + sum.inputCacheRead + sum.inputCacheCreation;
+    document.getElementById('usage-summary').innerHTML =
+      [['合计', fmt(total)], ['输入', fmt(sum.inputOther)], ['输出', fmt(sum.output)],
+       ['缓存命中', fmt(sum.inputCacheRead)]].map(([label, v], i) =>
+        '<div class="stat"><div class="label">' + label + '</div><div class="value">' + v + '</div>' +
+        '<div class="sub">' + ['范围内总量', '普通输入（未缓存）', '生成输出', '命中率 ' + hitRate(sum)][i] +
+        '</div></div>').join('');
+
+    const models = {};
+    for (const [dk, mm] of Object.entries(usageData.byDayModel || {})) {
+      if (!inRange(dk, r)) continue;
+      for (const [m, u] of Object.entries(mm)) {
+        models[m] = models[m] || { inputOther: 0, output: 0, inputCacheRead: 0, inputCacheCreation: 0 };
+        add(models[m], u);
+      }
+    }
+    document.getElementById('usage-by-model').innerHTML =
+      Object.entries(models).map(([m, u]) => {
+        const t = u.inputOther + u.output + u.inputCacheRead + u.inputCacheCreation;
+        return '<div class="mrow"><div class="line1"><span class="name">' + esc(m) +
+          ' <span class="pill">' + hitRate(u) + '</span></span><span class="total">' + fmt(t) + '</span></div>' +
+          '<div class="line2">入 ' + fmt(u.inputOther) + ' · 出 ' + fmt(u.output) +
+          ' · 命中 ' + fmt(u.inputCacheRead) + ' · 写 ' + fmt(u.inputCacheCreation) + '</div></div>';
+      }).join('') || '<div class="mrow muted">范围内暂无数据</div>';
+    renderSessions();
+  }
+
   document.getElementById('refresh').onclick = () => vscode.postMessage({ type: 'refresh' });
+  document.getElementById('range-preset').onchange = () => {
+    const custom = document.getElementById('range-preset').value === 'custom';
+    document.querySelectorAll('.range-date').forEach((el) => el.classList.toggle('show', custom));
+    if (custom && !document.getElementById('range-start').value) {
+      document.getElementById('range-start').value = dayStr(new Date(Date.now() - 6 * 86400000));
+      document.getElementById('range-end').value = dayStr(new Date());
+    }
+    page = 0;
+    renderUsage();
+  };
+  document.getElementById('range-start').onchange = () => { page = 0; renderUsage(); };
+  document.getElementById('range-end').onchange = () => { page = 0; renderUsage(); };
   document.getElementById('session-filter').oninput = () => { page = 0; renderSessions(); };
-  document.getElementById('session-range').onchange = () => { page = 0; renderSessions(); };
   document.getElementById('page-prev').onclick = () => { page--; renderSessions(); };
   document.getElementById('page-next').onclick = () => { page++; renderSessions(); };
 
@@ -503,32 +581,14 @@ function renderHtml(webview) {
     // 当前模型（思考档位切换功能已移除：官方 max 为会话级设置，写配置无法覆盖官方 UI，属缺陷不再展示）
     document.getElementById('effort-model').textContent = cfg.current ? cfg.current.displayName : '—';
 
-    // 用量统计卡
-    // 用量统计卡
-    const s = usage.totals;
-    document.getElementById('usage-summary').innerHTML =
-      [['今日', 'today'], ['近 7 天', 'last7d'], ['全部', 'all']].map(([label, k]) =>
-        '<div class="stat"><div class="label">' + label + '（合计）</div><div class="value">' + fmt(s[k].total || 0) +
-        '</div><div class="sub">入 ' + fmt(s[k].inputOther) + ' · 出 ' + fmt(s[k].output) + '</div>' +
-        '<div class="sub">命中率 ' + hitRate(s[k]) + ' · 缓存命中 ' + fmt(s[k].inputCacheRead) + '</div></div>').join('');
+    // 用量统计（统计卡 + 按模型 + 会话统一走当前时间范围）
+    usageData = usage;
     document.getElementById('usage-note').textContent =
       usage.scannedSessions + ' 个会话 · 缓存命中 ' + usage.cachedFiles + ' 文件 / 重扫 ' + usage.reparsedFiles +
       (usage.skippedLargeFiles ? ' · 跳过超大文件 ' + usage.skippedLargeFiles : '') +
       ' · 本地数据聚合，非账号 quota（额度用 CLI /usage 查看）';
-
-    // 按模型：合计 = 输入 + 输出 + 缓存命中 + 缓存写入
-    // 命中率 = 缓存读 / (缓存读 + 缓存写 + 普通输入)
-    document.getElementById('usage-by-model').innerHTML =
-      Object.entries(usage.byModel).map(([m, u]) =>
-        '<div class="mrow"><div class="line1"><span class="name">' + esc(m) +
-        ' <span class="pill">' + hitRate(u) + '</span></span><span class="total">' + fmt(u.total) + '</span></div>' +
-        '<div class="line2">入 ' + fmt(u.inputOther) + ' · 出 ' + fmt(u.output) +
-        ' · 命中 ' + fmt(u.inputCacheRead) + ' · 写 ' + fmt(u.inputCacheCreation) + '</div></div>').join('') ||
-      '<div class="mrow muted">暂无数据</div>';
-
-    // 最近会话：更新全量数据并重渲染（保持当前页码和筛选条件）
     allSessions = usage.recentSessions;
-    renderSessions();
+    renderUsage();
 
     // 上下文配置
     const cl = document.getElementById('context-list');
