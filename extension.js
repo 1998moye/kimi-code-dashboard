@@ -45,7 +45,9 @@ async function collectState({ forceQuota = false } = {}) {
     });
     extContext.globalState.update(QUOTA_KEY, { fetchedAt: Date.now(), quota });
   }
-  return { home, config, usage, quota };
+  // 最近会话实际运行的思考档位（覆盖官方插件选 max 不落盘的情况）
+  const sessionEffort = kimiConfig.detectSessionEffort(home);
+  return { home, config, usage, quota, sessionEffort };
 }
 
 function refreshStatusBar(state) {
@@ -323,9 +325,9 @@ function renderHtml(webview) {
   <div class="section">
     <div class="section-head"><span class="section-title">思考级别</span><span class="muted" id="effort-model"></span></div>
     <div class="card">
-      <div class="effort-now"><span class="effort-value" id="effort-current">…</span><span class="muted">当前生效（config.toml 持久化值）</span></div>
+      <div class="effort-now"><span class="effort-value" id="effort-current">…</span><span class="muted" id="effort-source">当前生效</span></div>
       <div class="seg" id="effort-buttons"></div>
-      <div class="muted" style="margin-top:10px">K3 / K2.7 为 always_thinking 模型，思考不可关闭，只能调强度；切换对新会话生效。注意：在官方插件/CLI 里切到 <b>max</b> 不会写入配置文件（官方设计，仅当前会话生效），此时本面板显示的持久化值会与其当前会话不一致；在本面板切 max 则会持久化，对新会话有效。</div>
+      <div class="muted" style="margin-top:10px">K3 / K2.7 为 always_thinking 模型，思考不可关闭，只能调强度。档位取自最近会话的实际运行值（官方插件里选 max 不落盘也能识别）；点击按钮写入 config.toml，对新会话生效。</div>
     </div>
   </div>
 
@@ -475,14 +477,22 @@ function renderHtml(webview) {
       if (cbBtn) cbBtn.onclick = () => vscode.postMessage({ type: 'copyBookmarklet' });
     }
 
-    // 思考级别
-    document.getElementById('effort-current').textContent = cfg.effectiveEffort || '—';
+    // 思考级别：优先显示最近会话的实际运行档位（能捕获官方插件里选的 max），
+    // 与配置持久化值不一致时两者都展示
+    const sessEff = state.sessionEffort;
+    const cfgEff = cfg.effectiveEffort;
+    const showEff = (sessEff && sessEff.effort) || cfgEff || '—';
+    document.getElementById('effort-current').textContent = showEff;
     document.getElementById('effort-model').textContent = cfg.current ? cfg.current.displayName : '';
+    document.getElementById('effort-source').textContent =
+      sessEff && sessEff.effort && sessEff.effort !== cfgEff
+        ? '最近会话实际值（配置持久化值：' + (cfgEff || '—') + '）'
+        : '当前生效（最近会话实际值）';
     const btns = document.getElementById('effort-buttons');
     btns.innerHTML = '';
     for (const e of (cfg.current && cfg.current.supportEfforts) || []) {
       const b = document.createElement('button');
-      b.className = e === cfg.effectiveEffort ? 'active' : '';
+      b.className = e === showEff ? 'active' : '';
       b.textContent = e;
       b.onclick = () => vscode.postMessage({ type: 'setEffort', effort: e });
       btns.appendChild(b);
