@@ -45,9 +45,7 @@ async function collectState({ forceQuota = false } = {}) {
     });
     extContext.globalState.update(QUOTA_KEY, { fetchedAt: Date.now(), quota });
   }
-  // 最近会话实际运行的思考档位（覆盖官方插件选 max 不落盘的情况）
-  const sessionEffort = kimiConfig.detectSessionEffort(home);
-  return { home, config, usage, quota, sessionEffort };
+  return { home, config, usage, quota };
 }
 
 function refreshStatusBar(state) {
@@ -58,9 +56,8 @@ function refreshStatusBar(state) {
     return;
   }
   const name = config.current ? config.current.displayName : (config.defaultModel || '?');
-  const effort = config.effectiveEffort || '?';
-  statusBar.text = `$(sparkle) ${name} · ${effort}`;
-  statusBar.tooltip = `Kimi Code 思考级别：${effort}\n模型：${config.defaultModel}\n点击切换档位（新会话生效）`;
+  statusBar.text = `$(sparkle) ${name}`;
+  statusBar.tooltip = `Kimi Code 当前模型：${name}\n点击切换思考档位（写 config.toml，新会话生效）`;
 }
 
 async function refreshAll(opts) {
@@ -227,8 +224,6 @@ function renderHtml(webview) {
   .accent { color: var(--accent); }
 
   /* 思考级别 */
-  .effort-now { display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px; }
-  .effort-value { font-size: 26px; font-weight: 700; color: var(--accent); }
   .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
   .seg button { background: transparent; color: var(--vscode-foreground); border: none; padding: 5px 16px;
                 cursor: pointer; font-size: 12px; opacity: .7; transition: all .15s; }
@@ -334,9 +329,8 @@ function renderHtml(webview) {
   <div class="section">
     <div class="section-head"><span class="section-title">思考级别</span><span class="muted" id="effort-model"></span></div>
     <div class="card">
-      <div class="effort-now"><span class="effort-value" id="effort-current">…</span><span class="muted" id="effort-source">当前生效</span></div>
       <div class="seg" id="effort-buttons"></div>
-      <div class="muted" style="margin-top:10px">K3 / K2.7 为 always_thinking 模型，思考不可关闭，只能调强度。档位取自最近会话的实际运行记录：官方界面切换档位后需发送一条消息才会产生记录（max 不落任何存储，仅随会话生效）；点击按钮写入 config.toml，对新会话生效。</div>
+      <div class="muted" style="margin-top:10px">K3 / K2.7 为 always_thinking 模型，思考不可关闭，只能调强度。此处为写入 config.toml 的持久化档位，对新会话生效；官方界面里选 max 不落配置，其 UI 显示与本面板可能不同，属官方设计。</div>
     </div>
   </div>
 
@@ -544,22 +538,14 @@ function renderHtml(webview) {
       if (cbBtn) cbBtn.onclick = () => vscode.postMessage({ type: 'copyBookmarklet' });
     }
 
-    // 思考级别：优先显示最近会话的实际运行档位（能捕获官方插件里选的 max），
-    // 与配置持久化值不一致时两者都展示
-    const sessEff = state.sessionEffort;
+    // 思考级别：只展示/写入 config.toml 持久化档位（这个值 100% 准确）
     const cfgEff = cfg.effectiveEffort;
-    const showEff = (sessEff && sessEff.effort) || cfgEff || '—';
-    document.getElementById('effort-current').textContent = showEff;
     document.getElementById('effort-model').textContent = cfg.current ? cfg.current.displayName : '';
-    document.getElementById('effort-source').textContent =
-      sessEff && sessEff.effort && sessEff.effort !== cfgEff
-        ? '最近会话实际值 · 记录于 ' + fmtDate(sessEff.mtimeMs) + '（配置持久化值：' + (cfgEff || '—') + '）'
-        : '最近会话实际值 · 记录于 ' + (sessEff ? fmtDate(sessEff.mtimeMs) : '—');
     const btns = document.getElementById('effort-buttons');
     btns.innerHTML = '';
     for (const e of (cfg.current && cfg.current.supportEfforts) || []) {
       const b = document.createElement('button');
-      b.className = e === showEff ? 'active' : '';
+      b.className = e === cfgEff ? 'active' : '';
       b.textContent = e;
       b.onclick = () => vscode.postMessage({ type: 'setEffort', effort: e });
       btns.appendChild(b);
