@@ -325,7 +325,7 @@ function renderHtml(webview) {
     <div class="card">
       <div class="effort-now"><span class="effort-value" id="effort-current">…</span><span class="muted">当前生效（config.toml 持久化值）</span></div>
       <div class="seg" id="effort-buttons"></div>
-      <div class="muted" style="margin-top:10px">K3 / K2.7 为 always_thinking 模型，思考不可关闭，只能调强度；切换对新会话生效。</div>
+      <div class="muted" style="margin-top:10px">K3 / K2.7 为 always_thinking 模型，思考不可关闭，只能调强度；切换对新会话生效。注意：在官方插件/CLI 里切到 <b>max</b> 不会写入配置文件（官方设计，仅当前会话生效），此时本面板显示的持久化值会与其当前会话不一致；在本面板切 max 则会持久化，对新会话有效。</div>
     </div>
   </div>
 
