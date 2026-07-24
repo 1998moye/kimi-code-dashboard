@@ -497,8 +497,9 @@ function renderHtml(webview) {
     };
     document.getElementById('usage-summary').innerHTML =
       [['今日', 'today'], ['近 7 天', 'last7d'], ['全部', 'all']].map(([label, k]) =>
-        '<div class="stat"><div class="label">' + label + '</div><div class="value">' + fmt(s[k].total || 0) +
-        '</div><div class="sub">输出 ' + fmt(s[k].output) + ' · 命中率 ' + hitRate(s[k]) + '</div></div>').join('');
+        '<div class="stat"><div class="label">' + label + '（合计）</div><div class="value">' + fmt(s[k].total || 0) +
+        '</div><div class="sub">入 ' + fmt(s[k].inputOther) + ' · 出 ' + fmt(s[k].output) + '</div>' +
+        '<div class="sub">命中率 ' + hitRate(s[k]) + ' · 缓存命中 ' + fmt(s[k].inputCacheRead) + '</div></div>').join('');
     document.getElementById('usage-note').textContent =
       usage.scannedSessions + ' 个会话 · 缓存命中 ' + usage.cachedFiles + ' 文件 / 重扫 ' + usage.reparsedFiles +
       (usage.skippedLargeFiles ? ' · 跳过超大文件 ' + usage.skippedLargeFiles : '') +
@@ -519,7 +520,10 @@ function renderHtml(webview) {
       '<div class="session" title="' + esc(r.workDir) + '">' +
       '<div class="line1"><span class="title">' + esc(r.title) + '</span><span class="tokens">' + fmt(r.total) + '</span></div>' +
       '<div class="line2"><span>' + r.models.map((m) => '<span class="pill">' + esc(m) + '</span>').join(' ') +
-      '</span><span class="muted">命中率 ' + hitRate(r.usage) + ' · ' + fmtDate(r.updatedAt) + '</span></div></div>').join('') ||
+      '</span><span class="muted">入 ' + fmt(r.usage.inputOther) + ' · 出 ' + fmt(r.usage.output) +
+      ' · 命中 ' + fmt(r.usage.inputCacheRead) + '</span></div>' +
+      '<div class="line2"><span class="muted">命中率 ' + hitRate(r.usage) + '</span>' +
+      '<span class="muted">' + fmtDate(r.updatedAt) + '</span></div></div>').join('') ||
       '<div class="session muted">暂无会话数据</div>';
 
     // 上下文配置
