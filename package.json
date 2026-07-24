@@ -2,7 +2,7 @@
   "name": "kimi-code-dashboard",
   "displayName": "Kimi Code 仪表盘",
   "description": "Kimi Code 辅助面板：思考级别切换、Token 用量统计、官方额度占比（5小时/每周/月度/赠送）、上下文配置",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "publisher": "Dingzhen",
   "license": "MIT",
   "repository": {
@@ -79,6 +79,11 @@
           "type": "string",
           "default": "",
           "description": "kimi.com 网页登录 token（用于显示月度总量/赠送额度；浏览器登录 kimi.com 后从开发者工具 Authorization: Bearer 头复制，约 30 天有效）"
+        },
+        "kimiCompanion.autoRefreshSeconds": {
+          "type": "number",
+          "default": 30,
+          "description": "面板自动刷新间隔（秒），0 为关闭；仅面板可见时刷新"
         }
       }
     }

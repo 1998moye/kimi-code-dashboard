@@ -281,6 +281,15 @@ function renderHtml(webview) {
           background: var(--vscode-badge-background, rgba(128,128,128,.3)); color: var(--vscode-badge-foreground, #fff); }
   .list-card { padding: 4px; }
 
+  /* 会话筛选与分页 */
+  .filter-bar { display: flex; gap: 6px; margin-bottom: 8px; }
+  .filter-bar input.ctx { flex: 1; min-width: 0; }
+  select.ctx { background: var(--vscode-input-background); color: var(--vscode-input-foreground);
+               border: 1px solid var(--vscode-input-border, var(--border)); border-radius: 4px;
+               padding: 4px 6px; font-size: 12px; }
+  .pager { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+  .pager-btns { display: inline-flex; gap: 6px; align-items: center; }
+
   /* 上下文配置 */
   .ctx-row { display: flex; align-items: center; gap: 8px; padding: 8px 4px; border-top: 1px solid var(--border); flex-wrap: wrap; }
   .ctx-row:first-of-type { border-top: none; }
@@ -343,7 +352,24 @@ function renderHtml(webview) {
     <div class="section-head" style="margin-top:4px"><span class="section-title">按模型</span></div>
     <div class="card list-card" id="usage-by-model"></div>
     <div class="section-head" style="margin-top:14px"><span class="section-title">最近会话</span></div>
+    <div class="filter-bar">
+      <input class="ctx" id="session-filter" placeholder="关键词（标题/目录）">
+      <select class="ctx" id="session-range">
+        <option value="0">全部时间</option>
+        <option value="1">今天</option>
+        <option value="3">近 3 天</option>
+        <option value="7">近 7 天</option>
+      </select>
+    </div>
     <div class="card list-card" id="usage-sessions"></div>
+    <div class="pager">
+      <span class="muted" id="session-subtotal"></span>
+      <span class="pager-btns">
+        <button class="btn ghost" id="page-prev">‹</button>
+        <span class="muted" id="page-info"></span>
+        <button class="btn ghost" id="page-next">›</button>
+      </span>
+    </div>
   </div>
 
   <div class="section">
@@ -369,8 +395,49 @@ function renderHtml(webview) {
     const p = (x) => String(x).padStart(2, '0');
     return (d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
   };
+  // 命中率 = 缓存读 / (缓存读 + 缓存写 + 普通输入)
+  const hitRate = (u) => {
+    const denom = u.inputCacheRead + u.inputCacheCreation + u.inputOther;
+    return denom > 0 ? Math.round((u.inputCacheRead / denom) * 100) + '%' : '—';
+  };
+
+  // 最近会话：筛选 + 分页
+  let allSessions = [], page = 0;
+  const PAGE_SIZE = 6;
+  const sessionRow = (r) =>
+    '<div class="session" title="' + esc(r.workDir) + '">' +
+    '<div class="line1"><span class="title">' + esc(r.title) + '</span><span class="tokens">' + fmt(r.total) + '</span></div>' +
+    '<div class="line2"><span>' + r.models.map((m) => '<span class="pill">' + esc(m) + '</span>').join(' ') +
+    '</span><span class="muted">入 ' + fmt(r.usage.inputOther) + ' · 出 ' + fmt(r.usage.output) +
+    ' · 命中 ' + fmt(r.usage.inputCacheRead) + '</span></div>' +
+    '<div class="line2"><span class="muted">命中率 ' + hitRate(r.usage) + '</span>' +
+    '<span class="muted">' + fmtDate(r.updatedAt) + '</span></div></div>';
+  function renderSessions() {
+    const kw = document.getElementById('session-filter').value.trim().toLowerCase();
+    const days = Number(document.getElementById('session-range').value);
+    let list = allSessions;
+    if (days > 0) {
+      const cutoff = Date.now() - days * 86400000;
+      list = list.filter((r) => r.updatedAt && Date.parse(r.updatedAt) >= cutoff);
+    }
+    if (kw) list = list.filter((r) => (r.title + ' ' + r.workDir).toLowerCase().includes(kw));
+    const totalTokens = list.reduce((a, r) => a + r.total, 0);
+    const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+    if (page >= pages) page = pages - 1;
+    if (page < 0) page = 0;
+    const slice = list.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+    document.getElementById('usage-sessions').innerHTML =
+      slice.map(sessionRow).join('') || '<div class="session muted">无匹配会话</div>';
+    document.getElementById('session-subtotal').textContent =
+      list.length + ' 个会话 · 合计 ' + fmt(totalTokens);
+    document.getElementById('page-info').textContent = (page + 1) + ' / ' + pages;
+  }
 
   document.getElementById('refresh').onclick = () => vscode.postMessage({ type: 'refresh' });
+  document.getElementById('session-filter').oninput = () => { page = 0; renderSessions(); };
+  document.getElementById('session-range').onchange = () => { page = 0; renderSessions(); };
+  document.getElementById('page-prev').onclick = () => { page--; renderSessions(); };
+  document.getElementById('page-next').onclick = () => { page++; renderSessions(); };
 
   // 重置倒计时：每秒刷新所有 .countdown 元素
   const fmtLeft = (ms) => {
@@ -499,12 +566,8 @@ function renderHtml(webview) {
     }
 
     // 用量统计卡
+    // 用量统计卡
     const s = usage.totals;
-    // 命中率 = 缓存读 / (缓存读 + 缓存写 + 普通输入)
-    const hitRate = (u) => {
-      const denom = u.inputCacheRead + u.inputCacheCreation + u.inputOther;
-      return denom > 0 ? Math.round((u.inputCacheRead / denom) * 100) + '%' : '—';
-    };
     document.getElementById('usage-summary').innerHTML =
       [['今日', 'today'], ['近 7 天', 'last7d'], ['全部', 'all']].map(([label, k]) =>
         '<div class="stat"><div class="label">' + label + '（合计）</div><div class="value">' + fmt(s[k].total || 0) +
@@ -525,16 +588,9 @@ function renderHtml(webview) {
         ' · 命中 ' + fmt(u.inputCacheRead) + ' · 写 ' + fmt(u.inputCacheCreation) + '</div></div>').join('') ||
       '<div class="mrow muted">暂无数据</div>';
 
-    // 最近会话
-    document.getElementById('usage-sessions').innerHTML = usage.recentSessions.map((r) =>
-      '<div class="session" title="' + esc(r.workDir) + '">' +
-      '<div class="line1"><span class="title">' + esc(r.title) + '</span><span class="tokens">' + fmt(r.total) + '</span></div>' +
-      '<div class="line2"><span>' + r.models.map((m) => '<span class="pill">' + esc(m) + '</span>').join(' ') +
-      '</span><span class="muted">入 ' + fmt(r.usage.inputOther) + ' · 出 ' + fmt(r.usage.output) +
-      ' · 命中 ' + fmt(r.usage.inputCacheRead) + '</span></div>' +
-      '<div class="line2"><span class="muted">命中率 ' + hitRate(r.usage) + '</span>' +
-      '<span class="muted">' + fmtDate(r.updatedAt) + '</span></div></div>').join('') ||
-      '<div class="session muted">暂无会话数据</div>';
+    // 最近会话：更新全量数据并重渲染（保持当前页码和筛选条件）
+    allSessions = usage.recentSessions;
+    renderSessions();
 
     // 上下文配置
     const cl = document.getElementById('context-list');
@@ -598,6 +654,15 @@ function activate(context) {
   } catch {
     // 监听失败不影响主功能
   }
+
+  // 定时自动刷新（默认 30s，仅面板可见时；额度接口有 60s 缓存、用量扫描是增量的，开销很小）
+  const autoTimer = setInterval(() => {
+    const seconds =
+      vscode.workspace.getConfiguration('kimiCompanion').get('autoRefreshSeconds') ?? 30;
+    if (seconds <= 0) return;
+    if (provider && provider.view && provider.view.visible) refreshAll();
+  }, 30000);
+  context.subscriptions.push({ dispose: () => clearInterval(autoTimer) });
 
   refreshAll();
 }
