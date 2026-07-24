@@ -336,7 +336,7 @@ function renderHtml(webview) {
     <div class="card">
       <div class="effort-now"><span class="effort-value" id="effort-current">…</span><span class="muted" id="effort-source">当前生效</span></div>
       <div class="seg" id="effort-buttons"></div>
-      <div class="muted" style="margin-top:10px">K3 / K2.7 为 always_thinking 模型，思考不可关闭，只能调强度。档位取自最近会话的实际运行值（官方插件里选 max 不落盘也能识别）；点击按钮写入 config.toml，对新会话生效。</div>
+      <div class="muted" style="margin-top:10px">K3 / K2.7 为 always_thinking 模型，思考不可关闭，只能调强度。档位取自最近会话的实际运行记录：官方界面切换档位后需发送一条消息才会产生记录（max 不落任何存储，仅随会话生效）；点击按钮写入 config.toml，对新会话生效。</div>
     </div>
   </div>
 
@@ -553,8 +553,8 @@ function renderHtml(webview) {
     document.getElementById('effort-model').textContent = cfg.current ? cfg.current.displayName : '';
     document.getElementById('effort-source').textContent =
       sessEff && sessEff.effort && sessEff.effort !== cfgEff
-        ? '最近会话实际值（配置持久化值：' + (cfgEff || '—') + '）'
-        : '当前生效（最近会话实际值）';
+        ? '最近会话实际值 · 记录于 ' + fmtDate(sessEff.mtimeMs) + '（配置持久化值：' + (cfgEff || '—') + '）'
+        : '最近会话实际值 · 记录于 ' + (sessEff ? fmtDate(sessEff.mtimeMs) : '—');
     const btns = document.getElementById('effort-buttons');
     btns.innerHTML = '';
     for (const e of (cfg.current && cfg.current.supportEfforts) || []) {
