@@ -42,7 +42,7 @@ curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash
 
 ## 功能
 
-- **状态栏常驻**：显示当前默认模型 + 生效的思考档位（如 `K3 · high`），点击弹出 QuickPick 切档
+- **状态栏常驻**：显示当前模型 + 今日 Token 用量（如 `K3 · 今日 2.43M`，可用 `kimiCompanion.statusBarUsage` 关闭），点击打开仪表盘
 - **侧边栏面板**（活动栏月亮图标）：
   - **思考级别**：当前生效档位高亮，按模型的 `support_efforts` 动态生成切换按钮
   - **额度占比**：官方接口实时数据（5 小时/每周/并发上限），网页接口补充月度总量与赠送额度，进度条 + 重置倒计时 + 手动刷新；OAuth token 过期自动刷新，无需手动跑 CLI

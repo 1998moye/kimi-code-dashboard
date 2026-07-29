@@ -48,16 +48,37 @@ async function collectState({ forceQuota = false } = {}) {
   return { home, config, usage, quota };
 }
 
+// token 简写：>=1亿 按亿显示（100M=1亿），否则沿用 M/K
+function fmtTokens(x) {
+  if (x >= 1e8) return (x / 1e8).toFixed(2) + '亿';
+  if (x >= 1e6) return (x / 1e6).toFixed(2) + 'M';
+  if (x >= 1e3) return (x / 1e3).toFixed(1) + 'K';
+  return String(x);
+}
+
+function showStatusBarUsage() {
+  return vscode.workspace.getConfiguration('kimiCompanion').get('statusBarUsage') !== false;
+}
+
 function refreshStatusBar(state) {
-  const { config } = state;
+  const { config, usage } = state;
   if (!config.exists) {
     statusBar.text = '$(warning) Kimi: 无配置';
     statusBar.tooltip = `未找到 ${config.configPath}`;
     return;
   }
   const name = config.current ? config.current.displayName : (config.defaultModel || '?');
-  statusBar.text = `$(sparkle) ${name}`;
-  statusBar.tooltip = `Kimi Code 当前模型：${name}\n点击切换思考档位（写 config.toml，新会话生效）`;
+  const withUsage = showStatusBarUsage() && usage && usage.totals;
+  const today = withUsage ? usage.totals.today : null;
+  statusBar.text = today
+    ? `$(sparkle) ${name} · 今日 ${fmtTokens(today.total)}`
+    : `$(sparkle) ${name}`;
+  statusBar.tooltip = today
+    ? `Kimi Code 当前模型：${name}\n今日用量：${fmtTokens(today.total)}` +
+      `（入 ${fmtTokens(today.inputOther)} · 出 ${fmtTokens(today.output)}` +
+      ` · 缓存命中 ${fmtTokens(today.inputCacheRead)} · 缓存写入 ${fmtTokens(today.inputCacheCreation)}）` +
+      '\n点击打开仪表盘'
+    : `Kimi Code 当前模型：${name}\n点击打开仪表盘`;
 }
 
 async function refreshAll(opts) {
@@ -244,9 +265,14 @@ function renderHtml(webview) {
   /* 会话筛选与分页 */
   .filter-bar { display: flex; gap: 6px; margin-bottom: 8px; }
   .filter-bar input.ctx { flex: 1; min-width: 0; }
-  select.ctx { background: var(--vscode-input-background); color: var(--vscode-input-foreground);
-               border: 1px solid var(--vscode-input-border, var(--border)); border-radius: 4px;
-               padding: 4px 6px; font-size: 12px; }
+  /* 下拉框：用 VS Code 下拉主题变量，且必须显式给 option 设色——
+     原生弹出列表不继承 select 的颜色，否则浅色文字落在白色列表上看不见 */
+  select.ctx { background: var(--vscode-dropdown-background, var(--vscode-input-background));
+               color: var(--vscode-dropdown-foreground, var(--vscode-input-foreground));
+               border: 1px solid var(--vscode-dropdown-border, var(--vscode-input-border, var(--border)));
+               border-radius: 4px; padding: 4px 6px; font-size: 12px; }
+  select.ctx option { background: var(--vscode-dropdown-background, var(--vscode-input-background));
+                      color: var(--vscode-dropdown-foreground, var(--vscode-input-foreground)); }
   input[type="date"].ctx { background: var(--vscode-input-background); color: var(--vscode-input-foreground);
                border: 1px solid var(--vscode-input-border, var(--border)); border-radius: 4px;
                padding: 3px 6px; font-size: 12px; color-scheme: dark; }
@@ -354,7 +380,7 @@ function renderHtml(webview) {
 
 <script nonce="${n}">
   const vscode = acquireVsCodeApi();
-  const fmt = (x) => x >= 1e6 ? (x / 1e6).toFixed(2) + 'M' : x >= 1e3 ? (x / 1e3).toFixed(1) + 'K' : String(x);
+  const fmt = (x) => x >= 1e8 ? (x / 1e8).toFixed(2) + '亿' : x >= 1e6 ? (x / 1e6).toFixed(2) + 'M' : x >= 1e3 ? (x / 1e3).toFixed(1) + 'K' : String(x);
   const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   const fmtDate = (iso) => {
     if (!iso) return '';
@@ -652,12 +678,13 @@ function activate(context) {
     // 监听失败不影响主功能
   }
 
-  // 定时自动刷新（默认 30s，仅面板可见时；额度接口有 60s 缓存、用量扫描是增量的，开销很小）
+  // 定时自动刷新（默认 30s，面板可见或状态栏显示用量时；额度接口有 60s 缓存、用量扫描是增量的，开销很小）
   const autoTimer = setInterval(() => {
     const seconds =
       vscode.workspace.getConfiguration('kimiCompanion').get('autoRefreshSeconds') ?? 30;
     if (seconds <= 0) return;
-    if (provider && provider.view && provider.view.visible) refreshAll();
+    const panelVisible = provider && provider.view && provider.view.visible;
+    if (panelVisible || showStatusBarUsage()) refreshAll();
   }, 30000);
   context.subscriptions.push({ dispose: () => clearInterval(autoTimer) });
 
