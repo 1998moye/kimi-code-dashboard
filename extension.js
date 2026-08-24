@@ -162,18 +162,18 @@ class DashboardProvider {
       return;
     }
     if (msg.type === 'copyBookmarklet') {
-      // 提取脚本：收集 cookie + localStorage 里所有 JWT，解码后筛掉过期的，
-      // 优先选 app_id=kimi 且带用户身份的；找不到有效 token 则指引 Application > Cookies。
+      // [20260824 扩展自动提取范围] Kimi 可能把当前 token 嵌在 JSON 存储值中，
+      // 因此扫描 Cookie、localStorage 和 sessionStorage 里的所有 JWT，而非只取完整值为 JWT 的条目。
       // 不用 clipboard API（页面无焦点时被拒），用 prompt 弹窗展示。
       const script =
-        "(()=>{const c=[];const m=document.cookie.match(/kimi-auth=([^;]+)/);if(m)c.push(decodeURIComponent(m[1]));" +
-        "for(const v of Object.values(localStorage)){if(typeof v==='string'&&v.indexOf('eyJ')===0)c.push(v)}" +
+        "(()=>{const c=[];const add=(v)=>{if(typeof v!=='string')return;try{v=decodeURIComponent(v)}catch(e){};const a=v.match(/eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+/g)||[];c.push(...a)};" +
+        "add(document.cookie);for(const s of [localStorage,sessionStorage]){for(let i=0;i<s.length;i++)add(s.getItem(s.key(i)))}" +
         "const dec=(t)=>{try{return JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))}catch(e){return null}};" +
         "let best=null;" +
         "for(const t of c){const j=dec(t);if(!j||!j.exp||j.exp*1000<Date.now())continue;" +
         "const s=(j.app_id==='kimi'?2:0)+(j.sub?1:0);" +
         "if(!best||s>best.s||(s===best.s&&j.exp>best.j.exp))best={t,j,s}}" +
-        "if(!best)return '未找到有效 token：请用 F12 → Application → Cookies → kimi.com → kimi-auth 双击值复制';" +
+        "if(!best)return '未找到有效 token：请刷新页面后重试；仍失败时用 F12 → Network → GetSubscriptionStats 的 Authorization 头';" +
         "prompt('token 如下，Ctrl+A 全选后 Ctrl+C 复制，然后回 VS Code 粘贴',best.t);" +
         "return '已弹出有效 token（有效期至 '+new Date(best.j.exp*1000).toLocaleDateString()+'）'})()";
       await vscode.env.clipboard.writeText(script);
@@ -590,11 +590,9 @@ function renderHtml(webview) {
             '<button class="btn ghost" id="open-kimi">打开额度页</button>' +
             '<button class="btn ghost" id="copy-bookmarklet">复制提取脚本</button></div>' +
             '<div class="token-guide">' +
-            // [20260824 更新获取指引] 浏览器可用刷新会话维持登录，而旧 Cookie 中的 access token 已过期；
-            // Network 里的 Authorization 是当前请求实际使用的凭据，优先级最高。
-            '<div class="way"><b>方式一（推荐，最可靠）</b>：① 点「打开额度页」并登录后刷新一次 → ② 按 F12 → 切到 Network（网络）→ 筛选 <code>GetSubscriptionStats</code>（没有就刷新页面）→ ③ 点该请求，在 Request Headers（请求标头）中复制 <code>Authorization: Bearer …</code> 里 <code>Bearer </code> 后的内容 → ④ 回这里粘贴保存</div>' +
-            '<div class="way"><b>方式二（Cookie 备用）</b>：F12 → Application（应用）→ Cookies → www.kimi.com → 复制 <code>kimi-auth</code> 的值。若仍提示过期，说明该 Cookie 是旧 access token，请改用方式一。</div>' +
-            '<div class="way"><b>方式三（脚本自动提取）</b>：① 打开额度页 → ② 点「复制提取脚本」→ ③ 回 kimi.com 页面按 F12 → Console（控制台）→ 粘贴 → 回车 → 弹窗里 Ctrl+A、Ctrl+C</div>' +
+            '<div class="way"><b>方式一（推荐，自动提取）</b>：① 点「打开额度页」并登录后刷新一次 → ② 点「复制提取脚本」→ ③ 回 kimi.com 页面按 F12 → Console（控制台）→ 粘贴 → 回车 → ④ 弹窗中 Ctrl+A、Ctrl+C → 回这里粘贴保存。脚本会自动跳过过期 Token。</div>' +
+            '<div class="way"><b>方式二（仅在自动提取失败时）</b>：F12 → Network（网络）→ 刷新页面 → 点 <code>GetSubscriptionStats</code> 请求 → 在 Request Headers 中复制 <code>Authorization: Bearer …</code> 里 <code>Bearer </code> 后的内容。</div>' +
+            '<div class="way"><b>方式三（Cookie 备用）</b>：F12 → Application（应用）→ Cookies → www.kimi.com → 复制 <code>kimi-auth</code> 的值。若仍提示过期，说明它是旧 access token，请用方式一。</div>' +
             '</div></div>';
         } else {
           const wrow = (label, usedPct, timeLabel, time) =>
