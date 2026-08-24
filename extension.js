@@ -137,7 +137,7 @@ class DashboardProvider {
       const expiresAt = quotaClient.jwtExp(t);
       if (expiresAt !== null && expiresAt <= Date.now()) {
         vscode.window.showErrorMessage(
-          '网页 token 已过期，未保存。请在 www.kimi.com 重新登录后复制 kimi-auth 的值。'
+          '网页 token 已过期，未保存。请在 www.kimi.com 的 F12 → Network 中复制最新请求的 Authorization 值。'
         );
         return;
       }
@@ -590,8 +590,11 @@ function renderHtml(webview) {
             '<button class="btn ghost" id="open-kimi">打开额度页</button>' +
             '<button class="btn ghost" id="copy-bookmarklet">复制提取脚本</button></div>' +
             '<div class="token-guide">' +
-            '<div class="way"><b>方式一（推荐，最可靠）</b>：① 点「打开额度页」并登录 → ② 按 F12 → 切到 Application（应用）标签 → 左侧展开 Cookies → 点 www.kimi.com → 找到 kimi-auth → 双击它的值 → Ctrl+C → ③ 回这里粘贴保存</div>' +
-            '<div class="way"><b>方式二（脚本自动提取）</b>：① 打开额度页 → ② 点「复制提取脚本」→ ③ 回 kimi.com 页面按 F12 → Console（控制台）→ 粘贴 → 回车 → 弹窗里 Ctrl+A、Ctrl+C</div>' +
+            // [20260824 更新获取指引] 浏览器可用刷新会话维持登录，而旧 Cookie 中的 access token 已过期；
+            // Network 里的 Authorization 是当前请求实际使用的凭据，优先级最高。
+            '<div class="way"><b>方式一（推荐，最可靠）</b>：① 点「打开额度页」并登录后刷新一次 → ② 按 F12 → 切到 Network（网络）→ 筛选 <code>GetSubscriptionStats</code>（没有就刷新页面）→ ③ 点该请求，在 Request Headers（请求标头）中复制 <code>Authorization: Bearer …</code> 里 <code>Bearer </code> 后的内容 → ④ 回这里粘贴保存</div>' +
+            '<div class="way"><b>方式二（Cookie 备用）</b>：F12 → Application（应用）→ Cookies → www.kimi.com → 复制 <code>kimi-auth</code> 的值。若仍提示过期，说明该 Cookie 是旧 access token，请改用方式一。</div>' +
+            '<div class="way"><b>方式三（脚本自动提取）</b>：① 打开额度页 → ② 点「复制提取脚本」→ ③ 回 kimi.com 页面按 F12 → Console（控制台）→ 粘贴 → 回车 → 弹窗里 Ctrl+A、Ctrl+C</div>' +
             '</div></div>';
         } else {
           const wrow = (label, usedPct, timeLabel, time) =>
