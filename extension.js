@@ -141,6 +141,14 @@ class DashboardProvider {
         );
         return;
       }
+      // [20260824 安全校验] refresh token 只能用于向认证服务换取 access token，
+      // 不能发送至会员额度接口，也不应由扩展保存。
+      if (quotaClient.jwtType(t) === 'refresh') {
+        vscode.window.showErrorMessage(
+          '这是 refresh token，不能用于查询额度，未保存。请使用提取脚本返回的 access token。'
+        );
+        return;
+      }
       await vscode.workspace
         .getConfiguration('kimiCompanion')
         .update('webToken', t, vscode.ConfigurationTarget.Global);
@@ -170,7 +178,7 @@ class DashboardProvider {
         "add(document.cookie);for(const s of [localStorage,sessionStorage]){for(let i=0;i<s.length;i++)add(s.getItem(s.key(i)))}" +
         "const dec=(t)=>{try{return JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))}catch(e){return null}};" +
         "let best=null;" +
-        "for(const t of c){const j=dec(t);if(!j||!j.exp||j.exp*1000<Date.now())continue;" +
+        "for(const t of c){const j=dec(t);if(!j||!j.exp||j.exp*1000<Date.now()||j.typ==='refresh')continue;" +
         "const s=(j.app_id==='kimi'?2:0)+(j.sub?1:0);" +
         "if(!best||s>best.s||(s===best.s&&j.exp>best.j.exp))best={t,j,s}}" +
         "if(!best)return '未找到有效 token：请刷新页面后重试；仍失败时用 F12 → Network → GetSubscriptionStats 的 Authorization 头';" +
@@ -590,7 +598,7 @@ function renderHtml(webview) {
             '<button class="btn ghost" id="open-kimi">打开额度页</button>' +
             '<button class="btn ghost" id="copy-bookmarklet">复制提取脚本</button></div>' +
             '<div class="token-guide">' +
-            '<div class="way"><b>方式一（推荐，自动提取）</b>：① 点「打开额度页」并登录后刷新一次 → ② 点「复制提取脚本」→ ③ 回 kimi.com 页面按 F12 → Console（控制台）→ 粘贴 → 回车 → ④ 弹窗中 Ctrl+A、Ctrl+C → 回这里粘贴保存。脚本会自动跳过过期 Token。</div>' +
+            '<div class="way"><b>方式一（推荐，自动提取）</b>：① 点「打开额度页」并登录后刷新一次 → ② 点「复制提取脚本」→ ③ 回 kimi.com 页面按 F12 → Console（控制台）→ 粘贴 → 回车 → ④ 弹窗中 Ctrl+A、Ctrl+C → 回这里粘贴保存。脚本会自动跳过过期 Token 和 refresh token。</div>' +
             '<div class="way"><b>方式二（仅在自动提取失败时）</b>：F12 → Network（网络）→ 刷新页面 → 点 <code>GetSubscriptionStats</code> 请求 → 在 Request Headers 中复制 <code>Authorization: Bearer …</code> 里 <code>Bearer </code> 后的内容。</div>' +
             '<div class="way"><b>方式三（Cookie 备用）</b>：F12 → Application（应用）→ Cookies → www.kimi.com → 复制 <code>kimi-auth</code> 的值。若仍提示过期，说明它是旧 access token，请用方式一。</div>' +
             '</div></div>';
