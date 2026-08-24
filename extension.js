@@ -85,6 +85,7 @@ async function refreshAll(opts) {
   const state = await collectState(opts);
   refreshStatusBar(state);
   if (provider) provider.postState(state);
+  return state;
 }
 
 class DashboardProvider {
@@ -127,13 +128,31 @@ class DashboardProvider {
       return;
     }
     if (msg.type === 'saveWebToken') {
-      const t = (msg.token || '').trim();
+      // [20260824 校验网页 Token] 保存成功仅代表配置已写入；先拦截过期值，避免用户误以为额度已获取。
+      const t = (msg.token || '')
+        .trim()
+        .replace(/^Bearer\s+/i, '')
+        .replace(/^(?:"|')|(?:"|')$/g, '');
       if (!t) return;
+      const expiresAt = quotaClient.jwtExp(t);
+      if (expiresAt !== null && expiresAt <= Date.now()) {
+        vscode.window.showErrorMessage(
+          '网页 token 已过期，未保存。请在 www.kimi.com 重新登录后复制 kimi-auth 的值。'
+        );
+        return;
+      }
       await vscode.workspace
         .getConfiguration('kimiCompanion')
         .update('webToken', t, vscode.ConfigurationTarget.Global);
-      vscode.window.showInformationMessage('网页 token 已保存');
-      await refreshAll({ forceQuota: true });
+      const state = await refreshAll({ forceQuota: true });
+      if (state.quota && state.quota.web && state.quota.web.ok) {
+        vscode.window.showInformationMessage('网页 token 已验证，月度额度已刷新');
+      } else {
+        vscode.window.showWarningMessage(
+          '网页 token 已保存，但未能获取月度额度：' +
+            ((state.quota && state.quota.web && state.quota.web.error) || '未知错误')
+        );
+      }
       return;
     }
     if (msg.type === 'openKimiWeb') {
