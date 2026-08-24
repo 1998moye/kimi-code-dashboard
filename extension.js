@@ -338,6 +338,10 @@ function renderHtml(webview) {
   .token-guide .way { margin-bottom: 8px; }
   .token-guide .way:last-child { margin-bottom: 0; }
   .token-guide b { color: var(--accent); }
+  .web-token-recovery { font-size: 12px; }
+  .web-token-recovery > summary { padding: 0; opacity: .65; }
+  .web-token-recovery > summary:hover { opacity: 1; }
+  .web-token-recovery-content { padding-top: 8px; }
 
   /* 窄侧栏（约 <260px）：进一步收紧布局 */
   @media (max-width: 260px) {
@@ -587,15 +591,18 @@ function renderHtml(webview) {
       if (web) {
         if (!web.ok) {
           ql.innerHTML += '<div class="qrow">' +
-            '<div class="muted" style="margin-bottom:6px">' +
+            // [20260824 整体折叠网页 Token 异常区] 旧版在 token 过期等异常时始终显示输入框、操作按钮和指引；保留原有功能，仅在用户展开后渲染可见内容。
+            '<details class="web-token-recovery">' +
+            '<summary><span class="pill">总额度</span> ' +
             esc(web.error === 'not-configured'
               ? '月度/赠送额度需要网页 token（约 30 天有效）'
               : web.error === 'mismatch'
                 ? '网页 token 属于另一个账号，请粘贴当前登录账号的 token'
                 : web.error === 'expired'
                   ? '网页 token 已过期，请按下面步骤重新获取'
-                  : web.error) +
-            '</div><div style="display:flex;gap:6px;flex-wrap:wrap">' +
+                  : web.error) + '（点击展开重新获取）</summary>' +
+            '<div class="web-token-recovery-content">' +
+            '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
             '<input class="ctx" id="web-token-input" style="flex:1;min-width:140px" placeholder="粘贴网页 token">' +
             '<button class="btn" id="save-web-token">保存</button>' +
             '<button class="btn ghost" id="open-kimi">打开额度页</button>' +
@@ -607,7 +614,7 @@ function renderHtml(webview) {
             '<div class="way"><b>方式一（推荐，自动提取）</b>：① 点「打开额度页」并登录后刷新一次 → ② 点「复制提取脚本」→ ③ 回 kimi.com 页面按 F12 → Console（控制台）→ 粘贴 → 回车 → ④ 弹窗中 Ctrl+A、Ctrl+C → 回这里粘贴保存。脚本会自动跳过过期 Token 和 refresh token。</div>' +
             '<div class="way"><b>方式二（仅在自动提取失败时）</b>：F12 → Network（网络）→ 刷新页面 → 点 <code>GetSubscriptionStats</code> 请求 → 在 Request Headers 中复制 <code>Authorization: Bearer …</code> 里 <code>Bearer </code> 后的内容。</div>' +
             '<div class="way"><b>方式三（Cookie 备用）</b>：F12 → Application（应用）→ Cookies → www.kimi.com → 复制 <code>kimi-auth</code> 的值。若仍提示过期，说明它是旧 access token，请用方式一。</div>' +
-            '</div></details></div>';
+            '</div></details></div></details></div>';
         } else {
           const wrow = (label, usedPct, timeLabel, time) =>
             '<div class="qrow"><div class="qhead"><span class="qlabel">' + label +
