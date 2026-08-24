@@ -330,8 +330,11 @@ function renderHtml(webview) {
   .paths { padding: 8px 4px; opacity: .6; line-height: 1.8; word-break: break-all; }
 
   /* token 获取指引 */
-  .token-guide { margin-top: 10px; padding: 10px; border: 1px solid var(--border); border-radius: 6px;
+  .token-guide { margin-top: 10px; border: 1px solid var(--border); border-radius: 6px;
                  font-size: 11px; line-height: 1.8; }
+  .token-guide summary { padding: 8px 10px; opacity: .8; }
+  .token-guide summary:hover { opacity: 1; }
+  .token-guide-content { padding: 0 10px 10px; }
   .token-guide .way { margin-bottom: 8px; }
   .token-guide .way:last-child { margin-bottom: 0; }
   .token-guide b { color: var(--accent); }
@@ -597,11 +600,14 @@ function renderHtml(webview) {
             '<button class="btn" id="save-web-token">保存</button>' +
             '<button class="btn ghost" id="open-kimi">打开额度页</button>' +
             '<button class="btn ghost" id="copy-bookmarklet">复制提取脚本</button></div>' +
-            '<div class="token-guide">' +
+            // [20260824 折叠网页 Token 获取指引] 旧版 token-guide 默认完整展开；保留原有三种获取方式，仅改为按需展开，减少过期提示占用面板空间。
+            '<details class="token-guide">' +
+            '<summary>获取网页 token 操作提示（需要时展开）</summary>' +
+            '<div class="token-guide-content">' +
             '<div class="way"><b>方式一（推荐，自动提取）</b>：① 点「打开额度页」并登录后刷新一次 → ② 点「复制提取脚本」→ ③ 回 kimi.com 页面按 F12 → Console（控制台）→ 粘贴 → 回车 → ④ 弹窗中 Ctrl+A、Ctrl+C → 回这里粘贴保存。脚本会自动跳过过期 Token 和 refresh token。</div>' +
             '<div class="way"><b>方式二（仅在自动提取失败时）</b>：F12 → Network（网络）→ 刷新页面 → 点 <code>GetSubscriptionStats</code> 请求 → 在 Request Headers 中复制 <code>Authorization: Bearer …</code> 里 <code>Bearer </code> 后的内容。</div>' +
             '<div class="way"><b>方式三（Cookie 备用）</b>：F12 → Application（应用）→ Cookies → www.kimi.com → 复制 <code>kimi-auth</code> 的值。若仍提示过期，说明它是旧 access token，请用方式一。</div>' +
-            '</div></div>';
+            '</div></details></div>';
         } else {
           const wrow = (label, usedPct, timeLabel, time) =>
             '<div class="qrow"><div class="qhead"><span class="qlabel">' + label +
