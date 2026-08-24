@@ -583,6 +583,11 @@ function renderHtml(webview) {
               '：<span class="countdown" data-ts="' + Date.parse(time) + '"></span></div>' : '') + '</div>';
           if (web.monthly) {
             ql.innerHTML += wrow('每月总量（订阅）', web.monthly.usedPercent, '重置', web.monthly.expireTime);
+            // [20260824 展示会员接口新增字段] 该占比是月度总量中由 Kimi Code 消耗的部分。
+            if (web.monthly.codeUsedPercent !== null && web.monthly.codeUsedPercent !== undefined) {
+              ql.innerHTML += '<div class="qrow muted">其中 Kimi Code 已用 ' +
+                web.monthly.codeUsedPercent + '%</div>';
+            }
           }
           for (const g of web.gifts || []) {
             ql.innerHTML += wrow('赠送额度', g.usedPercent, '截止', g.expireTime);
